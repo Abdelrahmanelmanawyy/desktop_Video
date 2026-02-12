@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "57118502421",
+    "project_id": "desktopvideo-eb98f",
+    "storage_bucket": "desktopvideo-eb98f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:57118502421:android:d74d884e48c2e9fc00e81c",
+        "android_client_info": {
+          "package_name": "com.example.desktop_recorder"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFRCx5GbFDQO7pSPpKfBy5OsOLr-GlB-M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

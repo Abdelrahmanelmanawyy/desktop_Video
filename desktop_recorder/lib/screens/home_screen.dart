@@ -1,0 +1,777 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as path;
+import 'package:video_player/video_player.dart';
+import 'package:desktop_recorder/providers/auth_provider.dart';
+import 'package:desktop_recorder/providers/recording_provider.dart';
+
+enum RecState { idle, recording, finalizing, finished, error }
+
+class HomeScreen extends ConsumerStatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  CameraController? _cameraController;
+  String? _cameraError;
+  RecState _recState = RecState.idle;
+  int _seconds = 0;
+  bool _warning75 = false;
+  String? _errorMsg;
+  bool _beepPlayed = false;
+  bool _timeUpShown = false;
+  Timer? _recordTimer;
+  String? _lastRecordedPath;
+  Timer? _inactivityTimer;
+  static const Duration _inactivityTimeout = Duration(seconds: 20);
+  int _recordingAttempts = 0;
+  static const int _maxRecordingAttempts = 3;
+
+  @override
+  void initState() {
+    super.initState();
+    if (Platform.isWindows) {
+      _initCamera();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _resetInactivityTimer());
+  }
+
+  void _resetInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(_inactivityTimeout, () {
+      if (mounted) ref.read(authStateProvider.notifier).signOut();
+    });
+  }
+
+  Future<void> _initCamera() async {
+    if (!Platform.isWindows || !mounted) return;
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty || !mounted) return;
+      final controller = CameraController(
+        cameras.first,
+        ResolutionPreset.medium,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() {
+        _cameraController = controller;
+        _cameraError = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _cameraError = e.toString());
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _recordTimer?.cancel();
+    _inactivityTimer?.cancel();
+    _cameraController?.dispose();
+    super.dispose();
+  }
+
+  String _formatDuration(int sec) {
+    final m = sec ~/ 60;
+    final s = sec % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _onStartStop() async {
+    if (!Platform.isWindows || _cameraController == null) return;
+    if (_recordingAttempts >= _maxRecordingAttempts && _recState != RecState.recording) {
+      return; // Prevent starting new recording if limit reached
+    }
+    final controller = _cameraController!;
+
+    if (_recState == RecState.recording) {
+      await _stopRecording();
+    } else {
+      await _startRecording(controller);
+    }
+  }
+
+  void _onRecordAgain() {
+    setState(() {
+      _recState = RecState.idle;
+      _lastRecordedPath = null;
+      _timeUpShown = false;
+    });
+  }
+
+  Future<void> _startRecording(CameraController controller) async {
+    setState(() {
+      _recState = RecState.recording;
+      _seconds = 0;
+      _warning75 = false;
+      _beepPlayed = false;
+      _timeUpShown = false;
+      _errorMsg = null;
+      _lastRecordedPath = null;
+    });
+
+    try {
+      await controller.startVideoRecording();
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+        if (!mounted) return;
+        setState(() {
+          _seconds++;
+          if (_seconds == 75) {
+            _warning75 = true;
+            if (!_beepPlayed) {
+              _beepPlayed = true;
+              SystemSound.play(SystemSoundType.alert);
+            }
+          }
+          if (_seconds >= 90) {
+            _recordTimer?.cancel();
+            _stopRecording();
+          }
+        });
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _recState = RecState.error;
+          _errorMsg = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    _recordTimer?.cancel();
+    _recordTimer = null;
+
+    if (_cameraController == null || !_cameraController!.value.isRecordingVideo) {
+      setState(() => _recState = RecState.idle);
+      return;
+    }
+
+    setState(() => _recState = RecState.finalizing);
+
+    try {
+      final file = await _cameraController!.stopVideoRecording();
+      if (!mounted) return;
+
+      final outputDir = Directory(saveDir);
+      await outputDir.create(recursive: true);
+      final outputPath = path.join(
+        saveDir,
+        'DesktopRecorder_${DateTime.now().millisecondsSinceEpoch}.mp4',
+      );
+      await file.saveTo(outputPath);
+
+      if (mounted) {
+        setState(() {
+          _recState = RecState.finished;
+          _lastRecordedPath = outputPath;
+          _timeUpShown = _seconds >= 90;
+          _beepPlayed = false;
+          _recordingAttempts++;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _recState = RecState.error;
+          _errorMsg = e.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isRecording = _recState == RecState.recording;
+    final isFinalizing = _recState == RecState.finalizing;
+    final isFinished = _recState == RecState.finished;
+    final isError = _recState == RecState.error;
+    final canStart = _recState == RecState.idle || isFinished || isError;
+
+    return Listener(
+      onPointerDown: (_) => _resetInactivityTimer(),
+      onPointerMove: (_) => _resetInactivityTimer(),
+      child: Scaffold(
+      backgroundColor: const Color(0xFF1A1D2E),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF252836),
+        elevation: 0,
+        foregroundColor: Colors.white,
+        title: Row(
+          children: [
+            Icon(Icons.videocam_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('Desktop Recorder'),
+          ],
+        ),
+        actions: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: _warning75
+                  ? Colors.orange.withValues(alpha: 0.2)
+                  : Colors.black54,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _warning75 ? Colors.orange : Colors.white24,
+                width: _warning75 ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  size: 20,
+                  color: _warning75 ? Colors.orange : Colors.white70,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _formatDuration(_seconds),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: _warning75 ? Colors.orange : Colors.white,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () => ref.read(authStateProvider.notifier).signOut(),
+            tooltip: 'Sign out',
+          ),
+        ],
+      ),
+      body: isFinished && _lastRecordedPath != null
+          ? _RecordedVideoPreview(
+              videoPath: _lastRecordedPath!,
+              wasTimeUp: _timeUpShown,
+              onRecordAgain: _onRecordAgain,
+              theme: theme,
+              canRecordAgain: _recordingAttempts < _maxRecordingAttempts,
+              attemptsRemaining: _maxRecordingAttempts - _recordingAttempts,
+            )
+          : Stack(
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _buildPreview(theme),
+                    if (_warning75 && isRecording)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: Colors.amber,
+                                width: 6,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            isRecording
+                                ? 'Recording in progress...'
+                                : _recordingAttempts >= _maxRecordingAttempts
+                                    ? 'Recording limit reached'
+                                    : 'Start when ready',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (_recordingAttempts >= _maxRecordingAttempts) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Maximum of $_maxRecordingAttempts recordings per session',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white54,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 32,
+                      child: Center(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: canStart || isRecording
+                                ? () => _onStartStop()
+                                : null,
+                            borderRadius: BorderRadius.circular(40),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isRecording
+                                    ? Colors.red.shade600
+                                    : Colors.green.shade600,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (isRecording
+                                            ? Colors.red
+                                            : Colors.green)
+                                        .withValues(alpha: 0.4),
+                                    blurRadius: 20,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                isRecording
+                                    ? Icons.stop_rounded
+                                    : Icons.fiber_manual_record_rounded,
+                                size: 48,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          if (_errorMsg != null)
+            Positioned(
+              top: 20,
+              left: 20,
+              right: 20,
+              child: _IndicatorChip(
+                icon: Icons.error_outline_rounded,
+                label: _errorMsg!,
+                color: Colors.red.shade400,
+              ),
+            ),
+
+          if (_timeUpShown && isFinalizing)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black54,
+                alignment: Alignment.center,
+                child: Container(
+                  margin: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF252836),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.red.shade400),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 24,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.timer_off_rounded,
+                        size: 48,
+                        color: Colors.red.shade400,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Time is up',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Recording stopped at 90 seconds.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          if (isFinalizing && !_timeUpShown)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black54,
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(color: Colors.white),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Saving recording...',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildPreview(ThemeData theme) {
+    if (_cameraError != null) {
+      return ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.videocam_off_rounded, size: 48, color: Colors.white38),
+              const SizedBox(height: 12),
+              Text(
+                'Camera unavailable',
+                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white54),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _cameraError!,
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white38),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_cameraController != null && _cameraController!.value.isInitialized) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: _cameraController!.value.previewSize?.width ?? 1,
+              height: _cameraController!.value.previewSize?.height ?? 1,
+              child: CameraPreview(_cameraController!),
+            ),
+          ),
+          CustomPaint(
+            painter: _FramingOverlayPainter(),
+          ),
+        ],
+      );
+    }
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: Colors.white54),
+            const SizedBox(height: 16),
+            Text(
+              'Loading camera...',
+              style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecordedVideoPreview extends StatefulWidget {
+  const _RecordedVideoPreview({
+    required this.videoPath,
+    required this.wasTimeUp,
+    required this.onRecordAgain,
+    required this.theme,
+    required this.canRecordAgain,
+    required this.attemptsRemaining,
+  });
+
+  final String videoPath;
+  final bool wasTimeUp;
+  final VoidCallback onRecordAgain;
+  final ThemeData theme;
+  final bool canRecordAgain;
+  final int attemptsRemaining;
+
+  @override
+  State<_RecordedVideoPreview> createState() => _RecordedVideoPreviewState();
+}
+
+class _RecordedVideoPreviewState extends State<_RecordedVideoPreview> {
+  late VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.videoPath))
+      ..initialize().then((_) {
+        if (mounted) setState(() {});
+      });
+    _controller.addListener(_onControllerUpdate);
+  }
+
+  void _onControllerUpdate() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _togglePlay() async {
+    if (!_controller.value.isInitialized) return;
+    if (_controller.value.isPlaying) {
+      _controller.pause();
+    } else {
+      final dur = _controller.value.duration;
+      final pos = _controller.value.position;
+      if (pos >= dur - const Duration(milliseconds: 500)) {
+        await _controller.seekTo(Duration.zero);
+      }
+      await _controller.play();
+    }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onControllerUpdate);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          if (widget.wasTimeUp)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.red.shade400.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade400),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.timer_off_rounded, color: Colors.red.shade400),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Recording stopped at 90 seconds',
+                    style: widget.theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.red.shade200,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (!widget.canRecordAgain)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade400.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.orange.shade400),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Colors.orange.shade400),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Maximum recording attempts reached',
+                    style: widget.theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.orange.shade200,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                alignment: Alignment.center,
+                fit: StackFit.expand,
+                children: [
+                  if (_controller.value.isInitialized)
+                    FittedBox(
+                      fit: BoxFit.contain,
+                      child: SizedBox(
+                        width: _controller.value.size.width,
+                        height: _controller.value.size.height,
+                        child: VideoPlayer(_controller),
+                      ),
+                    )
+                  else
+                    const ColoredBox(
+                      color: Colors.black,
+                      child: Center(
+                        child: CircularProgressIndicator(color: Colors.white54),
+                      ),
+                    ),
+                  GestureDetector(
+                    onTap: _togglePlay,
+                    child: Center(
+                      child: AnimatedOpacity(
+                        opacity: _controller.value.isInitialized &&
+                                !_controller.value.isPlaying
+                            ? 1
+                            : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          Icons.play_circle_filled_rounded,
+                          size: 80,
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_controller.value.isInitialized)
+                IconButton.filled(
+                  onPressed: _togglePlay,
+                  icon: Icon(
+                    _controller.value.isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFF252836),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              if (widget.canRecordAgain) ...[
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: widget.onRecordAgain,
+                  icon: const Icon(Icons.fiber_manual_record_rounded),
+                  label: Text('Record again (${widget.attemptsRemaining} left)'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.green.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _FramingOverlayPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white24
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(8)),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _IndicatorChip extends StatelessWidget {
+  const _IndicatorChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

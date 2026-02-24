@@ -5,7 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as path;
+import 'package:desktop_recorder/models/doctor.dart';
 import 'package:desktop_recorder/models/rec_state.dart';
 import 'package:desktop_recorder/providers/auth_provider.dart';
 import 'package:desktop_recorder/providers/recording_provider.dart';
@@ -47,6 +47,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _resetInactivityTimer() {
     _inactivityTimer?.cancel();
+    // Do not start sign-out countdown while camera is recording
+    if (_recState == RecState.recording) return;
     _inactivityTimer = Timer(_inactivityTimeout, () {
       if (mounted) ref.read(authStateProvider.notifier).signOut();
     });
@@ -87,9 +89,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   String _formatDuration(int sec) {
-    final m = sec ~/ 60;
-    final s = sec % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    return '$sec sn';
   }
 
   Future<void> _onStartStop() async {
@@ -124,6 +124,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _errorMsg = null;
       _lastRecordedPath = null;
     });
+    _inactivityTimer?.cancel(); // Pause sign-out countdown during recording
 
     try {
       await controller.startVideoRecording();
@@ -169,12 +170,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final file = await _cameraController!.stopVideoRecording();
       if (!mounted) return;
 
+      final user = ref.read(currentUserProvider);
+      final doctor = Doctor(
+        doctorId: user?.uid ?? 'unknown',
+        name: user?.username ?? '',
+      );
       final outputDir = Directory(saveDir);
       await outputDir.create(recursive: true);
-      final outputPath = path.join(
-        saveDir,
-        'DesktopRecorder_${DateTime.now().millisecondsSinceEpoch}.mp4',
-      );
+      final outputPath = recordingPath(doctor);
       await file.saveTo(outputPath);
 
       if (mounted) {
@@ -218,7 +221,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             Icon(Icons.videocam_rounded, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
-            const Text('Desktop Recorder'),
+            const Text('Masaüstü Kayıt'),
           ],
         ),
         actions: [
@@ -259,7 +262,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.logout_rounded),
             onPressed: () => ref.read(authStateProvider.notifier).signOut(),
-            tooltip: 'Sign out',
+            tooltip: 'Çıkış yap',
           ),
         ],
       ),
@@ -303,10 +306,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         children: [
                           Text(
                             isRecording
-                                ? 'Recording in progress...'
+                                ? 'Kayıt devam ediyor...'
                                 : _recordingAttempts >= _maxRecordingAttempts
-                                    ? 'Recording limit reached'
-                                    : 'Start when ready',
+                                    ? 'Kayıt limitine ulaşıldı'
+                                    : 'Hazır olunca başlat',
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: Colors.white70,
                               fontWeight: FontWeight.w500,
@@ -315,7 +318,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           if (_recordingAttempts >= _maxRecordingAttempts) ...[
                             const SizedBox(height: 8),
                             Text(
-                              'Maximum of $_maxRecordingAttempts recordings per session',
+                              'Oturum başına en fazla $_maxRecordingAttempts kayıt',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: Colors.white54,
                               ),
@@ -416,7 +419,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Time is up',
+                        'Süre doldu',
                         style: theme.textTheme.titleLarge?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -424,7 +427,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Recording stopped at 90 seconds.',
+                        'Kayıt 90. saniyede durduruldu.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
                         ),
@@ -447,7 +450,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     const CircularProgressIndicator(color: Colors.white),
                     const SizedBox(height: 20),
                     Text(
-                      'Saving recording...',
+                      'Kayıt kaydediliyor...',
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: Colors.white,
                       ),
@@ -473,7 +476,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Icon(Icons.videocam_off_rounded, size: 48, color: Colors.white38),
               const SizedBox(height: 12),
               Text(
-                'Camera unavailable',
+                'Kamera kullanılamıyor',
                 style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white54),
               ),
               const SizedBox(height: 8),
@@ -516,7 +519,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const CircularProgressIndicator(color: Colors.white54),
             const SizedBox(height: 16),
             Text(
-              'Loading camera...',
+              'Kamera yükleniyor...',
               style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white54),
             ),
           ],

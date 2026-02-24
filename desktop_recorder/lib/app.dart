@@ -13,7 +13,7 @@ class App extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
 
     return MaterialApp(
-      title: 'Desktop Recorder',
+      title: 'Masaüstü Kayıt',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
@@ -33,11 +33,11 @@ class App extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Error: $err'),
+                Text('Hata: $err'),
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () => ref.invalidate(authStateProvider),
-                  child: const Text('Retry'),
+                  child: const Text('Tekrar dene'),
                 ),
               ],
             ),

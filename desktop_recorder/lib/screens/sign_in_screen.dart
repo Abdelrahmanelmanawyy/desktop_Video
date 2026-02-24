@@ -13,8 +13,10 @@ class SignInScreen extends ConsumerStatefulWidget {
 
 class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _usernameFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
 
   static const int _maxFailedAttempts = 3;
   static const int _lockoutSeconds = 30;
@@ -31,8 +33,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   void dispose() {
     _lockoutTimer?.cancel();
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
+    _usernameFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -61,7 +65,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     });
     try {
       await ref.read(authStateProvider.notifier).signIn(
-            _emailController.text,
+            _usernameController.text,
             _passwordController.text,
           );
       // Success: auth updates and we're replaced by HomeScreen; no setState.
@@ -128,7 +132,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Sign in',
+                      'Giriş yap',
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -136,7 +140,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Use your email and password to sign in.',
+                      'Adınız ve şifrenizle giriş yapın.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
@@ -176,21 +180,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       const SizedBox(height: 16),
                     ],
                     TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _usernameController,
+                      focusNode: _usernameFocusNode,
+                      keyboardType: TextInputType.name,
                       textInputAction: TextInputAction.next,
+                      autofocus: true,
+                      onTap: () => _usernameFocusNode.requestFocus(),
                       decoration: const InputDecoration(
-                        labelText: 'Email',
-                        hintText: 'you@example.com',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        labelText: 'Ad',
+                        hintText: '',
+                        prefixIcon: Icon(Icons.person_outline_rounded),
                         border: OutlineInputBorder(),
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Enter your email';
-                        }
-                        if (!v.contains('@') || !v.contains('.')) {
-                          return 'Enter a valid email';
+                          return 'Adınızı girin';
                         }
                         return null;
                       },
@@ -198,11 +202,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _passwordController,
+                      focusNode: _passwordFocusNode,
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
+                      onTap: () => _passwordFocusNode.requestFocus(),
                       onFieldSubmitted: (_) => _submit(),
                       decoration: InputDecoration(
-                        labelText: 'Password',
+                        labelText: 'Şifre',
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
@@ -218,7 +224,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ),
                       validator: (v) {
                         if (v == null || v.isEmpty) {
-                          return 'Enter your password';
+                          return 'Şifrenizi girin';
                         }
                         return null;
                       },
@@ -243,7 +249,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Too many attempts. Try again in ${_lockoutRemainingSeconds}s',
+                              'Çok fazla deneme. ${_lockoutRemainingSeconds} saniye sonra tekrar deneyin.',
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.error,
                                 fontWeight: FontWeight.w500,
@@ -265,7 +271,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               width: 22,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_isLockedOut ? 'Locked' : 'Sign in'),
+                          : Text(_isLockedOut ? 'Kilitli' : 'Giriş yap'),
                     ),
                   ],
                 ),

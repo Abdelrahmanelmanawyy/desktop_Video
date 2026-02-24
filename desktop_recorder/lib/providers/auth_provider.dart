@@ -11,6 +11,15 @@ const _baseAuthUrl = 'https://identitytoolkit.googleapis.com/v1/accounts';
 const _secureTokenUrl = 'https://securetoken.googleapis.com/v1/token';
 const _refreshTokenKey = 'firebase_refresh_token';
 
+/// Firebase Email/Password uses email as identifier; we use username@desktop.local
+const _usernameEmailSuffix = '@desktop.local';
+
+/// Converts a username to the Firebase "email" we store (username@desktop.local).
+String _usernameToFirebaseEmail(String username) {
+  final clean = username.trim().toLowerCase().split(RegExp(r'@')).first;
+  return '$clean$_usernameEmailSuffix';
+}
+
 final authStateProvider =
     StateNotifierProvider<AuthNotifier, AsyncValue<AuthUser?>>((ref) {
   return AuthNotifier();
@@ -47,9 +56,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
     }
   }
 
-  Future<void> signUp(String email, String password) async {
+  Future<void> signUp(String username, String password) async {
     state = const AsyncValue.loading();
     try {
+      final email = _usernameToFirebaseEmail(username);
       final uri = Uri.parse(
         '$_baseAuthUrl:signUp?key=$firebaseWebApiKey',
       );
@@ -64,7 +74,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
       );
       final data = jsonDecode(res.body) as Map<String, dynamic>?;
       if (res.statusCode != 200) {
-        final message = _errorMessage(data) ?? 'Sign up failed';
+        final message = _errorMessage(data) ?? 'Kayıt başarısız';
         state = const AsyncValue.data(null);
         throw AuthException(message);
       }
@@ -73,7 +83,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
       final emailRes = data['email'] as String?;
       if (localId == null || emailRes == null) {
         state = const AsyncValue.data(null);
-        throw AuthException('Invalid response');
+        throw AuthException('Geçersiz yanıt');
       }
       await _persistRefreshToken(refreshToken);
       state = AsyncValue.data(AuthUser(uid: localId, email: emailRes));
@@ -84,10 +94,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
     }
   }
 
-  Future<void> signIn(String email, String password) async {
+  Future<void> signIn(String username, String password) async {
     // Don't set loading here - SignInScreen shows its own spinner.
     // Avoids AuthGate switching to full-screen loader (the "refresh").
     try {
+      final email = _usernameToFirebaseEmail(username);
       final uri = Uri.parse(
         '$_baseAuthUrl:signInWithPassword?key=$firebaseWebApiKey',
       );
@@ -102,7 +113,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
       );
       final data = jsonDecode(res.body) as Map<String, dynamic>?;
       if (res.statusCode != 200) {
-        final message = _errorMessage(data) ?? 'Sign in failed';
+        final message = _errorMessage(data) ?? 'Giriş başarısız';
         state = const AsyncValue.data(null);
         throw AuthException(message);
       }
@@ -111,7 +122,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
       final emailRes = data['email'] as String?;
       if (localId == null || emailRes == null) {
         state = const AsyncValue.data(null);
-        throw AuthException('Invalid response');
+        throw AuthException('Geçersiz yanıt');
       }
       await _persistRefreshToken(refreshToken);
       state = AsyncValue.data(AuthUser(uid: localId, email: emailRes));
@@ -177,19 +188,19 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
     // Convert Firebase error codes to readable messages
     switch (msg) {
       case 'EMAIL_NOT_FOUND':
-        return 'No account found for this email.';
+        return 'Bu kullanıcı adına ait hesap bulunamadı.';
       case 'INVALID_PASSWORD':
-        return 'Wrong password.';
+        return 'Yanlış şifre.';
       case 'USER_DISABLED':
-        return 'This account has been disabled.';
+        return 'Bu hesap devre dışı bırakıldı.';
       case 'INVALID_LOGIN_CREDENTIALS':
-        return 'Invalid email or password.';
+        return 'Geçersiz kullanıcı adı veya şifre.';
       case 'EMAIL_EXISTS':
-        return 'This email is already registered.';
+        return 'Bu kullanıcı adı zaten kayıtlı.';
       case 'OPERATION_NOT_ALLOWED':
-        return 'Sign up is not enabled.';
+        return 'Kayıt açık değil.';
       case 'WEAK_PASSWORD':
-        return 'Password is too weak.';
+        return 'Şifre yeterince güçlü değil.';
       default:
         return msg;
     }

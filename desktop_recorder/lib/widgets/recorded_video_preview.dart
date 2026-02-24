@@ -85,7 +85,7 @@ class _RecordedVideoPreviewState extends State<RecordedVideoPreview> {
                   Icon(Icons.timer_off_rounded, color: Colors.red.shade400),
                   const SizedBox(width: 8),
                   Text(
-                    'Recording stopped at 90 seconds',
+                    'Kayıt 90. saniyede durduruldu',
                     style: widget.theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.red.shade200,
                     ),
@@ -108,7 +108,7 @@ class _RecordedVideoPreviewState extends State<RecordedVideoPreview> {
                   Icon(Icons.info_outline_rounded, color: Colors.orange.shade400),
                   const SizedBox(width: 8),
                   Text(
-                    'Maximum recording attempts reached',
+                    'Maksimum kayıt denemesi aşıldı',
                     style: widget.theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.orange.shade200,
                     ),
@@ -182,7 +182,7 @@ class _RecordedVideoPreviewState extends State<RecordedVideoPreview> {
                 FilledButton.icon(
                   onPressed: widget.onRecordAgain,
                   icon: const Icon(Icons.fiber_manual_record_rounded),
-                  label: Text('Record again (${widget.attemptsRemaining} left)'),
+                  label: Text('Tekrar kaydet (${widget.attemptsRemaining} kaldı)'),
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.green.shade600,
                     foregroundColor: Colors.white,

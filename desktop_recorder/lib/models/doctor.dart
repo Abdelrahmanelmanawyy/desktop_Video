@@ -3,14 +3,17 @@
 class Doctor {
   const Doctor({
     required this.doctorId,
+    this.name = '',
   });
 
   final String doctorId;
+  final String name;
 
   /// Create from Firestore document map.
   factory Doctor.fromFirestore(Map<String, dynamic> data) {
     return Doctor(
       doctorId: data['doctor_id'] as String? ?? '',
+      name: data['name'] as String? ?? '',
     );
   }
 
@@ -18,6 +21,7 @@ class Doctor {
   Map<String, dynamic> toFirestore() {
     return {
       'doctor_id': doctorId,
+      'name': name,
     };
   }
 }

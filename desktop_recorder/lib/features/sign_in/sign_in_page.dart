@@ -21,14 +21,14 @@ class SignInPage extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Desktop Recorder',
+                  'Masaüstü Kayıt',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign in to continue',
+                  'Devam etmek için giriş yapın',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -37,11 +37,11 @@ class SignInPage extends ConsumerWidget {
                 TextField(
                   onChanged: controller.setEmail,
                   decoration: const InputDecoration(
-                    labelText: 'Email',
+                    labelText: 'Ad',
                     border: OutlineInputBorder(),
-                    hintText: 'you@example.com',
+                    hintText: 'örn. Ahmet',
                   ),
-                  keyboardType: TextInputType.emailAddress,
+                  keyboardType: TextInputType.name,
                   textInputAction: TextInputAction.next,
                   enabled: !state.isLoading,
                 ),
@@ -49,7 +49,7 @@ class SignInPage extends ConsumerWidget {
                 TextField(
                   onChanged: controller.setPassword,
                   decoration: const InputDecoration(
-                    labelText: 'Password',
+                    labelText: 'Şifre',
                     border: OutlineInputBorder(),
                   ),
                   obscureText: true,
@@ -79,14 +79,14 @@ class SignInPage extends ConsumerWidget {
                                 width: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text('Sign in'),
+                            : const Text('Giriş yap'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
                         onPressed: state.isLoading ? null : () => controller.signUp(),
-                        child: const Text('Sign up'),
+                        child: const Text('Kayıt ol'),
                       ),
                     ),
                   ],

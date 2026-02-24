@@ -4,7 +4,9 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   camera_windows
+  screen_retriever_windows
   video_player_win
+  window_manager
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

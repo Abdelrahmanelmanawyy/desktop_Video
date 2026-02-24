@@ -11,6 +11,7 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  // ignore: prefer_final_fields
   int _counter = 0;
 
   @override
@@ -20,14 +21,14 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Desktop Recorder'),
+        title: const Text('Masaüstü Kayıt'),
         actions: [
           if (user != null)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Center(
                 child: Text(
-                  user.email,
+                  user.username,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -37,7 +38,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             onPressed: () async {
               await ref.read(authStateProvider.notifier).signOut();
             },
-            tooltip: 'Sign out',
+            tooltip: 'Çıkış yap',
           ),
         ],
       ),
@@ -45,7 +46,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('You are signed in.'),
+            const Text('Giriş yaptınız.'),
             const SizedBox(height: 16),
             Text(
               '$_counter',

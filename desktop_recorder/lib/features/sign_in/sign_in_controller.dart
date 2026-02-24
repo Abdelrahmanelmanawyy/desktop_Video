@@ -123,7 +123,7 @@ class SignInController extends Notifier<SignInFormState> {
     if (msg.contains('network')) {
       return 'Network error. Please try again.';
     }
-    return 'Sign in failed. Please try again.';
+    return 'Giriş başarısız. Lütfen tekrar deneyin.';
   }
 }
 

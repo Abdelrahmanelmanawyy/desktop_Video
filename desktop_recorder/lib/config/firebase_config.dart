@@ -2,6 +2,5 @@
 /// Web API Key from Firebase Console → Project Settings → General.
 const String firebaseWebApiKey = 'AIzaSyCW_JdKsUaG0NIBqA9KxDPy6U4xVVDE-_I';
 
-/// Storage bucket for uploads (e.g. yourproject.appspot.com).
-/// From Firebase Console → Storage → bucket name.
-const String firebaseStorageBucket = 'desktop-recorder.appspot.com';
+/// Storage bucket for uploads (gs://desktoprecorder.firebasestorage.app).
+const String firebaseStorageBucket = 'desktoprecorder.firebasestorage.app';

@@ -152,6 +152,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+      await ref.read(authStateProvider.notifier).signOut();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

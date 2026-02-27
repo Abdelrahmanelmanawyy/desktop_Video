@@ -9,6 +9,7 @@ import 'package:desktop_recorder/models/doctor.dart';
 import 'package:desktop_recorder/models/rec_state.dart';
 import 'package:desktop_recorder/providers/auth_provider.dart';
 import 'package:desktop_recorder/providers/recording_provider.dart';
+import 'package:desktop_recorder/services/video_upload_service.dart';
 import 'package:desktop_recorder/widgets/framing_overlay_painter.dart';
 import 'package:desktop_recorder/widgets/indicator_chip.dart';
 import 'package:desktop_recorder/widgets/recorded_video_preview.dart';
@@ -35,6 +36,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const Duration _inactivityTimeout = Duration(seconds: 20);
   int _recordingAttempts = 0;
   static const int _maxRecordingAttempts = 3;
+  bool _isSending = false;
+  double _sendProgress = 0.0;
 
   @override
   void initState() {
@@ -111,7 +114,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _recState = RecState.idle;
       _lastRecordedPath = null;
       _timeUpShown = false;
+      _isSending = false;
+      _sendProgress = 0.0;
     });
+  }
+
+  Future<void> _onSendPressed() async {
+    final path = _lastRecordedPath;
+    final user = ref.read(currentUserProvider);
+    if (path == null || user == null) return;
+
+    setState(() {
+      _isSending = true;
+      _sendProgress = 0.0;
+    });
+
+    final result = await zipAndUploadVideo(
+      videoPath: path,
+      uid: user.uid,
+      getIdToken: () => ref.read(authStateProvider.notifier).getIdToken(),
+      onProgress: (p) {
+        if (mounted) setState(() => _sendProgress = p);
+      },
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isSending = false;
+      _sendProgress = 0.0;
+    });
+
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Kayıt başarıyla gönderildi.'),
+          backgroundColor: Colors.green.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.errorMessage ?? 'Gönderilemedi.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _startRecording(CameraController controller) async {
@@ -217,48 +266,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         backgroundColor: const Color(0xFF252836),
         elevation: 0,
         foregroundColor: Colors.white,
-        title: Row(
-          children: [
-            Icon(Icons.videocam_rounded, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            const Text('Masaüstü Kayıt'),
-          ],
-        ),
-        actions: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: _warning75
-                  ? Colors.orange.withValues(alpha: 0.2)
-                  : Colors.black54,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: _warning75 ? Colors.orange : Colors.white24,
-                width: _warning75 ? 2 : 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.timer_outlined,
-                  size: 20,
-                  color: _warning75 ? Colors.orange : Colors.white70,
+        titleSpacing: 0,
+        title: SizedBox(
+          width: double.infinity,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.videocam_rounded, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    const Text('Masaüstü Kayıt'),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  _formatDuration(_seconds),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: _warning75 ? Colors.orange : Colors.white,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
+              ),
+              Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _warning75
+                        ? Colors.orange.withValues(alpha: 0.2)
+                        : Colors.black54,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _warning75 ? Colors.orange : Colors.white24,
+                      width: _warning75 ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.timer_outlined,
+                        size: 28,
+                        color: _warning75 ? Colors.orange : Colors.white70,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _formatDuration(_seconds),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: _warning75 ? Colors.orange : Colors.white,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 22,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
+        actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded),
             onPressed: () => ref.read(authStateProvider.notifier).signOut(),
@@ -274,6 +338,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               theme: theme,
               canRecordAgain: _recordingAttempts < _maxRecordingAttempts,
               attemptsRemaining: _maxRecordingAttempts - _recordingAttempts,
+              onSendPressed: _onSendPressed,
+              isSending: _isSending,
+              sendProgress: _sendProgress,
             )
           : Stack(
         children: [

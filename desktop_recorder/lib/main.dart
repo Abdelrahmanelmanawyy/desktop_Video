@@ -12,6 +12,17 @@ import 'package:desktop_recorder/screens/sign_in_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Suppress known Flutter keyboard state assertion (e.g. after app focus loss/restore)
+  final originalOnError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    if (details.toString().contains('HardwareKeyboard') &&
+        details.toString().contains('_pressedKeys.containsKey')) {
+      return;
+    }
+    originalOnError?.call(details);
+  };
+
   await windowManager.ensureInitialized();
   const options = WindowOptions(
     fullScreen: true,

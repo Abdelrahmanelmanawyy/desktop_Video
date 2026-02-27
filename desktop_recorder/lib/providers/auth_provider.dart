@@ -36,24 +36,12 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
   }
 
   Future<void> _restoreSession() async {
+    // When app is opened (after close), user must sign in again – do not restore session
     try {
       final prefs = await SharedPreferences.getInstance();
-      final refreshToken = prefs.getString(_refreshTokenKey);
-      if (refreshToken == null || refreshToken.isEmpty) {
-        state = const AsyncValue.data(null);
-        return;
-      }
-      final user = await _refreshToken(refreshToken);
-      if (user != null) {
-        await _persistRefreshToken(user.refreshToken!);
-        state = AsyncValue.data(AuthUser(uid: user.uid, email: user.email));
-      } else {
-        await prefs.remove(_refreshTokenKey);
-        state = const AsyncValue.data(null);
-      }
-    } catch (_) {
-      state = const AsyncValue.data(null);
-    }
+      await prefs.remove(_refreshTokenKey);
+    } catch (_) {}
+    state = const AsyncValue.data(null);
   }
 
   Future<void> signUp(String username, String password) async {
@@ -145,6 +133,24 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
     await prefs.setString(_refreshTokenKey, token);
   }
 
+  /// Returns current Firebase ID token for Storage/API calls. Null if not signed in.
+  Future<String?> getIdToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final refreshToken = prefs.getString(_refreshTokenKey);
+    if (refreshToken == null || refreshToken.isEmpty) return null;
+    final uri = Uri.parse('$_secureTokenUrl?key=$firebaseWebApiKey');
+    final res = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'grant_type=refresh_token&refresh_token=${Uri.encodeComponent(refreshToken)}',
+    );
+    if (res.statusCode != 200) return null;
+    final data = jsonDecode(res.body) as Map<String, dynamic>?;
+    return data?['id_token'] as String?;
+  }
+
+  /// Kept for potential future "remember me" / session restore.
+  // ignore: unused_element
   Future<_TokenResponse?> _refreshToken(String refreshToken) async {
     final uri = Uri.parse('$_secureTokenUrl?key=$firebaseWebApiKey');
     final res = await http.post(

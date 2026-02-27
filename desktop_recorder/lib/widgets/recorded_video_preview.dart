@@ -12,6 +12,9 @@ class RecordedVideoPreview extends StatefulWidget {
     required this.theme,
     required this.canRecordAgain,
     required this.attemptsRemaining,
+    this.onSendPressed,
+    this.isSending = false,
+    this.sendProgress = 0.0,
   });
 
   final String videoPath;
@@ -20,6 +23,9 @@ class RecordedVideoPreview extends StatefulWidget {
   final ThemeData theme;
   final bool canRecordAgain;
   final int attemptsRemaining;
+  final VoidCallback? onSendPressed;
+  final bool isSending;
+  final double sendProgress;
 
   @override
   State<RecordedVideoPreview> createState() => _RecordedVideoPreviewState();
@@ -161,6 +167,40 @@ class _RecordedVideoPreviewState extends State<RecordedVideoPreview> {
             ),
           ),
           const SizedBox(height: 24),
+          if (widget.onSendPressed != null) ...[
+            if (widget.isSending) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(
+                      value: widget.sendProgress,
+                      backgroundColor: Colors.white24,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade400),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.sendProgress < 0.5 ? 'Sıkıştırılıyor...' : 'Gönderiliyor...',
+                      style: widget.theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ] else
+              FilledButton.icon(
+                onPressed: widget.onSendPressed,
+                icon: const Icon(Icons.cloud_upload_rounded),
+                label: const Text('Gönder'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.blue.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                ),
+              ),
+            const SizedBox(height: 16),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -177,7 +217,7 @@ class _RecordedVideoPreviewState extends State<RecordedVideoPreview> {
                     foregroundColor: Colors.white,
                   ),
                 ),
-              if (widget.canRecordAgain) ...[
+              if (widget.canRecordAgain && !widget.isSending) ...[
                 const SizedBox(width: 16),
                 FilledButton.icon(
                   onPressed: widget.onRecordAgain,

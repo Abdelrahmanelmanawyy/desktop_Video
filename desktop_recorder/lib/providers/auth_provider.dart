@@ -31,18 +31,7 @@ final currentUserProvider = Provider<AuthUser?>((ref) {
 });
 
 class AuthNotifier extends StateNotifier<AsyncValue<AuthUser?>> {
-  AuthNotifier() : super(const AsyncValue.loading()) {
-    _restoreSession();
-  }
-
-  Future<void> _restoreSession() async {
-    // When app is opened (after close), user must sign in again – do not restore session
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_refreshTokenKey);
-    } catch (_) {}
-    state = const AsyncValue.data(null);
-  }
+  AuthNotifier() : super(const AsyncValue.data(null));
 
   Future<void> signUp(String username, String password) async {
     state = const AsyncValue.loading();

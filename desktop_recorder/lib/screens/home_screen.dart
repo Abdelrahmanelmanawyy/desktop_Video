@@ -45,7 +45,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (Platform.isWindows) {
       _initCamera();
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _resetInactivityTimer());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _resetInactivityTimer(),
+    );
   }
 
   void _resetInactivityTimer() {
@@ -57,14 +59,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  /// Only use Canon cameras (EOS Webcam Utility or name contains "eos").
+  static List<CameraDescription> _filterCanonCameras(List<CameraDescription> cameras) {
+    return cameras.where((c) {
+      final name = c.name.toLowerCase();
+      return name.contains('eos') || name.contains('webcam utility') || name.contains('canon');
+    }).toList();
+  }
+
   Future<void> _initCamera() async {
     if (!Platform.isWindows || !mounted) return;
     try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty || !mounted) return;
+      final allCameras = await availableCameras();
+      if (!mounted) return;
+      final canonCameras = _filterCanonCameras(allCameras);
+      if (canonCameras.isEmpty) {
+        setState(() {
+          _cameraError = 'Canon kamera bulunamadı. Canon kameranızı bağlayın ve '
+              'EOS Webcam Utility\'nin çalıştığından emin olun.';
+        });
+        return;
+      }
+      // Prefer EOS Webcam Utility if available
+      final camera = canonCameras.firstWhere(
+        (c) => c.name.toLowerCase().contains('eos') || c.name.toLowerCase().contains('webcam utility'),
+        orElse: () => canonCameras.first,
+      );
       final controller = CameraController(
-        cameras.first,
-        ResolutionPreset.medium,
+        camera,
+        ResolutionPreset.high,
+        enableAudio: true,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
       await controller.initialize();
@@ -97,7 +121,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _onStartStop() async {
     if (!Platform.isWindows || _cameraController == null) return;
-    if (_recordingAttempts >= _maxRecordingAttempts && _recState != RecState.recording) {
+    if (_recordingAttempts >= _maxRecordingAttempts &&
+        _recState != RecState.recording) {
       return; // Prevent starting new recording if limit reached
     }
     final controller = _cameraController!;
@@ -209,7 +234,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _recordTimer?.cancel();
     _recordTimer = null;
 
-    if (_cameraController == null || !_cameraController!.value.isRecordingVideo) {
+    if (_cameraController == null ||
+        !_cameraController!.value.isRecordingVideo) {
       setState(() => _recState = RecState.idle);
       return;
     }
@@ -262,273 +288,286 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       onPointerDown: (_) => _resetInactivityTimer(),
       onPointerMove: (_) => _resetInactivityTimer(),
       child: Scaffold(
-      backgroundColor: const Color(0xFF1A1D2E),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF252836),
-        elevation: 0,
-        foregroundColor: Colors.white,
-        titleSpacing: 0,
-        title: SizedBox(
-          width: double.infinity,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.videocam_rounded, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
-                    const Text('Masaüstü Kayıt'),
-                  ],
-                ),
-              ),
-              Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _warning75
-                        ? Colors.orange.withValues(alpha: 0.2)
-                        : Colors.black54,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _warning75 ? Colors.orange : Colors.white24,
-                      width: _warning75 ? 2 : 1,
-                    ),
-                  ),
+        backgroundColor: const Color(0xFF1A1D2E),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF252836),
+          elevation: 0,
+          foregroundColor: Colors.white,
+          titleSpacing: 0,
+          title: SizedBox(
+            width: double.infinity,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.timer_outlined,
-                        size: 28,
-                        color: _warning75 ? Colors.orange : Colors.white70,
+                        Icons.videocam_rounded,
+                        color: theme.colorScheme.primary,
                       ),
-                      const SizedBox(width: 10),
-                      Text(
-                        _formatDuration(_seconds),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: _warning75 ? Colors.orange : Colors.white,
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22,
-                        ),
-                      ),
+                      const SizedBox(width: 8),
+                      const Text('Masaüstü Kayıt'),
                     ],
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () => ref.read(authStateProvider.notifier).signOut(),
-            tooltip: 'Çıkış yap',
-          ),
-        ],
-      ),
-      body: isFinished && _lastRecordedPath != null
-          ? RecordedVideoPreview(
-              videoPath: _lastRecordedPath!,
-              wasTimeUp: _timeUpShown,
-              onRecordAgain: _onRecordAgain,
-              theme: theme,
-              canRecordAgain: _recordingAttempts < _maxRecordingAttempts,
-              attemptsRemaining: _maxRecordingAttempts - _recordingAttempts,
-              onSendPressed: _onSendPressed,
-              isSending: _isSending,
-              sendProgress: _sendProgress,
-            )
-          : Stack(
-        children: [
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _buildPreview(theme),
-                    if (_warning75 && isRecording)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: Colors.amber,
-                                width: 6,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _warning75
+                          ? Colors.orange.withValues(alpha: 0.2)
+                          : Colors.black54,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _warning75 ? Colors.orange : Colors.white24,
+                        width: _warning75 ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 28,
+                          color: _warning75 ? Colors.orange : Colors.white70,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _formatDuration(_seconds),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: _warning75 ? Colors.orange : Colors.white,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 22,
                           ),
                         ),
-                      ),
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            isRecording
-                                ? 'Kayıt devam ediyor...'
-                                : _recordingAttempts >= _maxRecordingAttempts
-                                    ? 'Kayıt limitine ulaşıldı'
-                                    : 'Hazır olunca başlat',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w500,
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout_rounded),
+              onPressed: () => ref.read(authStateProvider.notifier).signOut(),
+              tooltip: 'Çıkış yap',
+            ),
+          ],
+        ),
+        body: isFinished && _lastRecordedPath != null
+            ? RecordedVideoPreview(
+                videoPath: _lastRecordedPath!,
+                wasTimeUp: _timeUpShown,
+                onRecordAgain: _onRecordAgain,
+                theme: theme,
+                canRecordAgain: _recordingAttempts < _maxRecordingAttempts,
+                attemptsRemaining: _maxRecordingAttempts - _recordingAttempts,
+                onSendPressed: _onSendPressed,
+                isSending: _isSending,
+                sendProgress: _sendProgress,
+              )
+            : Stack(
+                children: [
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            _buildPreview(theme),
+                            if (_warning75 && isRecording)
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: Colors.amber,
+                                        width: 6,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    isRecording
+                                        ? 'Kayıt devam ediyor...'
+                                        : _recordingAttempts >=
+                                              _maxRecordingAttempts
+                                        ? 'Kayıt limitine ulaşıldı'
+                                        : 'Hazır olunca başlat',
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                          color: Colors.white70,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                  ),
+                                  if (_recordingAttempts >=
+                                      _maxRecordingAttempts) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Oturum başına en fazla $_maxRecordingAttempts kayıt',
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(color: Colors.white54),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
-                          ),
-                          if (_recordingAttempts >= _maxRecordingAttempts) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              'Oturum başına en fazla $_maxRecordingAttempts kayıt',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white54,
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 32,
+                              child: Center(
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: canStart || isRecording
+                                        ? () => _onStartStop()
+                                        : null,
+                                    borderRadius: BorderRadius.circular(40),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      width: 100,
+                                      height: 100,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: isRecording
+                                            ? Colors.red.shade600
+                                            : Colors.green.shade600,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color:
+                                                (isRecording
+                                                        ? Colors.red
+                                                        : Colors.green)
+                                                    .withValues(alpha: 0.4),
+                                            blurRadius: 20,
+                                            spreadRadius: 2,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(
+                                        isRecording
+                                            ? Icons.stop_rounded
+                                            : Icons.fiber_manual_record_rounded,
+                                        size: 48,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
                     ),
+                  ),
+
+                  if (_errorMsg != null)
                     Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 32,
-                      child: Center(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: canStart || isRecording
-                                ? () => _onStartStop()
-                                : null,
-                            borderRadius: BorderRadius.circular(40),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 100,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isRecording
-                                    ? Colors.red.shade600
-                                    : Colors.green.shade600,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: (isRecording
-                                            ? Colors.red
-                                            : Colors.green)
-                                        .withValues(alpha: 0.4),
-                                    blurRadius: 20,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
+                      top: 20,
+                      left: 20,
+                      right: 20,
+                      child: IndicatorChip(
+                        icon: Icons.error_outline_rounded,
+                        label: _errorMsg!,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+
+                  if (_timeUpShown && isFinalizing)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black54,
+                        alignment: Alignment.center,
+                        child: Container(
+                          margin: const EdgeInsets.all(32),
+                          padding: const EdgeInsets.all(28),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF252836),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.red.shade400),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                blurRadius: 24,
+                                spreadRadius: 4,
                               ),
-                              child: Icon(
-                                isRecording
-                                    ? Icons.stop_rounded
-                                    : Icons.fiber_manual_record_rounded,
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.timer_off_rounded,
                                 size: 48,
-                                color: Colors.white,
+                                color: Colors.red.shade400,
                               ),
-                            ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Süre doldu',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Kayıt 90. saniyede durduruldu.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white70,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
 
-          if (_errorMsg != null)
-            Positioned(
-              top: 20,
-              left: 20,
-              right: 20,
-              child: IndicatorChip(
-                icon: Icons.error_outline_rounded,
-                label: _errorMsg!,
-                color: Colors.red.shade400,
-              ),
-            ),
-
-          if (_timeUpShown && isFinalizing)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black54,
-                alignment: Alignment.center,
-                child: Container(
-                  margin: const EdgeInsets.all(32),
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF252836),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.red.shade400),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 24,
-                        spreadRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.timer_off_rounded,
-                        size: 48,
-                        color: Colors.red.shade400,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Süre doldu',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                  if (isFinalizing && !_timeUpShown)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black54,
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Kayıt kaydediliyor...',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Kayıt 90. saniyede durduruldu.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.white70,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          if (isFinalizing && !_timeUpShown)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black54,
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(color: Colors.white),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Kayıt kaydediliyor...',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
-            ),
-        ],
-      ),
       ),
     );
   }
@@ -538,24 +577,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return ColoredBox(
         color: Colors.black,
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.videocam_off_rounded, size: 48, color: Colors.white38),
-              const SizedBox(height: 12),
-              Text(
-                'Kamera kullanılamıyor',
-                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white54),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _cameraError!,
-                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white38),
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.videocam_off_rounded, size: 48, color: Colors.white38),
+                const SizedBox(height: 12),
+                Text(
+                  'Kamera kullanılamıyor',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white54,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _cameraError!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.white38,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: _initCamera,
+                  icon: const Icon(Icons.refresh, size: 20),
+                  label: const Text('Yeniden dene'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -572,9 +624,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: CameraPreview(_cameraController!),
             ),
           ),
-          CustomPaint(
-            painter: FramingOverlayPainter(),
-          ),
+          CustomPaint(painter: FramingOverlayPainter()),
         ],
       );
     }
@@ -588,7 +638,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 16),
             Text(
               'Kamera yükleniyor...',
-              style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white54),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white54,
+              ),
             ),
           ],
         ),

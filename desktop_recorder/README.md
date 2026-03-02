@@ -50,36 +50,41 @@ A Flutter-based desktop video recording application designed for kiosk environme
 
 ---
 
-## Project Structure
+## Project Structure (Clean Architecture)
 
 ```
 desktop_recorder/
 ├── lib/
-│   ├── main.dart                 # App entry, kiosk escape, auth gate
-│   ├── config/
-│   │   ├── firebase_config.dart   # Firebase API key, storage bucket
-│   │   └── kiosk_config.dart      # Admin PIN, stop file path
-│   ├── models/
-│   │   ├── auth_user.dart        # Signed-in user model
-│   │   ├── doctor.dart           # Doctor model (uid, name)
-│   │   └── rec_state.dart        # Recording state enum
-│   ├── providers/
-│   │   ├── auth_provider.dart    # Firebase auth (sign in/up, token)
-│   │   └── recording_provider.dart # Save path, filename helpers
-│   ├── screens/
-│   │   ├── home_screen.dart      # Camera, recording, preview, upload
-│   │   └── sign_in_screen.dart  # Login form, lockout
-│   ├── services/
-│   │   └── video_upload_service.dart # Zip + Firebase Storage upload
-│   └── widgets/
-│       ├── framing_overlay_painter.dart # Frame guide overlay
-│       ├── indicator_chip.dart   # Warning/error chip
-│       └── recorded_video_preview.dart  # Playback + send UI
-├── assets/bin/                   # FFmpeg (optional, for future use)
-├── recordings/                  # Local recording output
+│   ├── main.dart                    # App entry, kiosk escape, auth gate
+│   ├── core/
+│   │   └── config/
+│   │       ├── firebase_config.dart  # Firebase API key, storage bucket
+│   │       └── kiosk_config.dart     # Admin PIN, stop file path
+│   ├── data/
+│   │   ├── models/
+│   │   │   ├── auth_user.dart        # Signed-in user model
+│   │   │   ├── doctor.dart            # Doctor model (uid, name)
+│   │   │   └── rec_state.dart        # Recording state enum
+│   │   └── services/
+│   │       └── video_upload_service.dart # Zip + Firebase Storage upload
+│   ├── presentation/
+│   │   ├── providers/
+│   │   │   ├── auth_provider.dart    # Firebase auth (sign in/up, token)
+│   │   │   └── recording_provider.dart # Save path, filename helpers
+│   │   ├── screens/
+│   │   │   ├── home_screen.dart      # Camera, recording, preview, upload
+│   │   │   └── sign_in_screen.dart  # Login form, lockout
+│   │   └── widgets/
+│   │       ├── framing_overlay_painter.dart # Frame guide overlay
+│   │       ├── indicator_chip.dart   # Warning/error chip
+│   │       └── recorded_video_preview.dart  # Playback + send UI
+│   ├── features/sign_in/            # Alternate sign-in (SignInPage)
+│   └── app.dart, home_page.dart      # Alternate app entry (optional)
+├── assets/bin/                       # FFmpeg (optional, for future use)
+├── recordings/                       # Local recording output
 ├── docs/
-│   ├── kiosk_setup.md           # Soft kiosk deployment
-│   └── recording_verification.md # Recording verification checklist
+│   ├── kiosk_setup.md               # Soft kiosk deployment
+│   └── recording_verification.md    # Recording verification checklist
 └── pubspec.yaml
 ```
 
@@ -109,7 +114,7 @@ desktop_recorder/
    - Create a Firebase project at [Firebase Console](https://console.firebase.google.com)
    - Enable Email/Password authentication
    - Create a Storage bucket
-   - Copy Web API Key and bucket name to `lib/config/firebase_config.dart`:
+   - Copy Web API Key and bucket name to `lib/core/config/firebase_config.dart`:
      ```dart
      const String firebaseWebApiKey = 'YOUR_WEB_API_KEY';
      const String firebaseStorageBucket = 'your-bucket.appspot.com';
@@ -158,11 +163,11 @@ See `docs/kiosk_setup.md` for full details.
 
 | Setting | Location | Description |
 |---------|-----------|-------------|
-| Admin PIN | `kiosk_config.dart` | Default `1234`; change for production |
-| Firebase | `firebase_config.dart` | API key, storage bucket |
-| Inactivity timeout | `home_screen.dart` | 20 seconds before auto sign-out |
-| Max recording attempts | `home_screen.dart` | 3 per session |
-| Max recording duration | `home_screen.dart` | 90 seconds |
+| Admin PIN | `core/config/kiosk_config.dart` | Default `1234`; change for production |
+| Firebase | `core/config/firebase_config.dart` | API key, storage bucket |
+| Inactivity timeout | `presentation/screens/home_screen.dart` | 20 seconds before auto sign-out |
+| Max recording attempts | `presentation/screens/home_screen.dart` | 3 per session |
+| Max recording duration | `presentation/screens/home_screen.dart` | 90 seconds |
 
 ---
 

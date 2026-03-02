@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:desktop_recorder/config/firebase_config.dart';
-import 'package:desktop_recorder/models/auth_user.dart';
+import 'package:desktop_recorder/core/config/firebase_config.dart';
+import 'package:desktop_recorder/data/models/auth_user.dart';
 
 const _baseAuthUrl = 'https://identitytoolkit.googleapis.com/v1/accounts';
 const _secureTokenUrl = 'https://securetoken.googleapis.com/v1/token';

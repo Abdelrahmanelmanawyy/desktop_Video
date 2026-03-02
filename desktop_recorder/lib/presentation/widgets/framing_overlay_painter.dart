@@ -8,10 +8,7 @@ class FramingOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(8)),
-      paint,
-    );
+    canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(8)), paint);
   }
 
   @override

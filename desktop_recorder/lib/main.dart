@@ -5,10 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'package:desktop_recorder/config/kiosk_config.dart';
-import 'package:desktop_recorder/providers/auth_provider.dart';
-import 'package:desktop_recorder/screens/home_screen.dart';
-import 'package:desktop_recorder/screens/sign_in_screen.dart';
+import 'package:desktop_recorder/core/config/kiosk_config.dart';
+import 'package:desktop_recorder/presentation/providers/auth_provider.dart';
+import 'package:desktop_recorder/presentation/screens/home_screen.dart';
+import 'package:desktop_recorder/presentation/screens/sign_in_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,10 +28,9 @@ void main() async {
     fullScreen: true,
     alwaysOnTop: true,
   );
-  windowManager.waitUntilReadyToShow(options).then((_) {
-    windowManager.show();
-    windowManager.focus();
-  });
+  await windowManager.waitUntilReadyToShow(options);
+  windowManager.show();
+  windowManager.focus();
   runApp(
     const ProviderScope(
       child: MyApp(),

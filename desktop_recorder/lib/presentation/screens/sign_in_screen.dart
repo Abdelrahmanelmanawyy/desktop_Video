@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:desktop_recorder/providers/auth_provider.dart';
+import 'package:desktop_recorder/presentation/providers/auth_provider.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -68,7 +68,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             _usernameController.text,
             _passwordController.text,
           );
-      // Success: auth updates and we're replaced by HomeScreen; no setState.
     } on AuthException catch (e) {
       if (!mounted) return;
       final newCount = _failedAttempts + 1;
@@ -82,11 +81,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       });
       if (newCount >= _maxFailedAttempts) _startLockout();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(e.message), backgroundColor: Theme.of(context).colorScheme.error, behavior: SnackBarBehavior.floating),
       );
     } catch (e) {
       if (!mounted) return;
@@ -101,11 +96,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       });
       if (newCount >= _maxFailedAttempts) _startLockout();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error, behavior: SnackBarBehavior.floating),
       );
     }
   }
@@ -125,55 +116,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.lock_outline_rounded,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    Icon(Icons.lock_outline_rounded, size: 64, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(height: 24),
-                    Text(
-                      'Giriş yap',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
+                    Text('Giriş yap', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                     const SizedBox(height: 8),
-                    Text(
-                      'Adınız ve şifrenizle giriş yapın.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
+                    Text('Adınız ve şifrenizle giriş yapın.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
                     const SizedBox(height: 32),
                     if (_errorMessage != null) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .errorContainer
-                              .withValues(alpha: 0.5),
+                          color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.error_outline_rounded,
-                              color: Theme.of(context).colorScheme.error,
-                              size: 20,
-                            ),
+                            Icon(Icons.error_outline_rounded, color: Theme.of(context).colorScheme.error, size: 20),
                             const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _errorMessage!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
+                            Expanded(child: Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 13))),
                           ],
                         ),
                       ),
@@ -186,18 +146,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       textInputAction: TextInputAction.next,
                       autofocus: true,
                       onTap: () => _usernameFocusNode.requestFocus(),
-                      decoration: const InputDecoration(
-                        labelText: 'Ad',
-                        hintText: '',
-                        prefixIcon: Icon(Icons.person_outline_rounded),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Adınızı girin';
-                        }
-                        return null;
-                      },
+                      decoration: const InputDecoration(labelText: 'Ad', hintText: '', prefixIcon: Icon(Icons.person_outline_rounded), border: OutlineInputBorder()),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Adınızı girin' : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -212,49 +162,25 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                          ),
-                          onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
-                          },
+                          icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return 'Şifrenizi girin';
-                        }
-                        return null;
-                      },
+                      validator: (v) => (v == null || v.isEmpty) ? 'Şifrenizi girin' : null,
                     ),
                     if (_isLockedOut) ...[
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .errorContainer
-                              .withValues(alpha: 0.5),
+                          color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.lock_clock_rounded,
-                              color: Theme.of(context).colorScheme.error,
-                              size: 24,
-                            ),
+                            Icon(Icons.lock_clock_rounded, color: Theme.of(context).colorScheme.error, size: 24),
                             const SizedBox(width: 12),
-                            Text(
-                              'Çok fazla deneme. ${_lockoutRemainingSeconds} saniye sonra tekrar deneyin.',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
+                            Text('Çok fazla deneme. $_lockoutRemainingSeconds saniye sonra tekrar deneyin.', style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ),
@@ -262,16 +188,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     ],
                     FilledButton(
                       onPressed: (_isLoading || _isLockedOut) ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(_isLockedOut ? 'Kilitli' : 'Giriş yap'),
+                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      child: _isLoading ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2)) : Text(_isLockedOut ? 'Kilitli' : 'Giriş yap'),
                     ),
                   ],
                 ),

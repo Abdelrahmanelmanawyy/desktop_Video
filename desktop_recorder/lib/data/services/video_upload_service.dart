@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 
-import 'package:desktop_recorder/config/firebase_config.dart';
+import 'package:desktop_recorder/core/config/firebase_config.dart';
 
 /// Result of zip + upload. [success] true if upload succeeded.
 class VideoUploadResult {

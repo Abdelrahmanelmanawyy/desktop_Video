@@ -90,12 +90,7 @@ class _RecordedVideoPreviewState extends State<RecordedVideoPreview> {
                 children: [
                   Icon(Icons.timer_off_rounded, color: Colors.red.shade400),
                   const SizedBox(width: 8),
-                  Text(
-                    'Kayıt 90. saniyede durduruldu',
-                    style: widget.theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.red.shade200,
-                    ),
-                  ),
+                  Text('Kayıt 90. saniyede durduruldu', style: widget.theme.textTheme.bodyMedium?.copyWith(color: Colors.red.shade200)),
                 ],
               ),
             ),
@@ -113,12 +108,7 @@ class _RecordedVideoPreviewState extends State<RecordedVideoPreview> {
                 children: [
                   Icon(Icons.info_outline_rounded, color: Colors.orange.shade400),
                   const SizedBox(width: 8),
-                  Text(
-                    'Maksimum kayıt denemesi aşıldı',
-                    style: widget.theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.orange.shade200,
-                    ),
-                  ),
+                  Text('Maksimum kayıt denemesi aşıldı', style: widget.theme.textTheme.bodyMedium?.copyWith(color: Colors.orange.shade200)),
                 ],
               ),
             ),
@@ -141,24 +131,15 @@ class _RecordedVideoPreviewState extends State<RecordedVideoPreview> {
                   else
                     const ColoredBox(
                       color: Colors.black,
-                      child: Center(
-                        child: CircularProgressIndicator(color: Colors.white54),
-                      ),
+                      child: Center(child: CircularProgressIndicator(color: Colors.white54)),
                     ),
                   GestureDetector(
                     onTap: _togglePlay,
                     child: Center(
                       child: AnimatedOpacity(
-                        opacity: _controller.value.isInitialized &&
-                                !_controller.value.isPlaying
-                            ? 1
-                            : 0,
+                        opacity: _controller.value.isInitialized && !_controller.value.isPlaying ? 1 : 0,
                         duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          Icons.play_circle_filled_rounded,
-                          size: 80,
-                          color: Colors.white.withValues(alpha: 0.85),
-                        ),
+                        child: Icon(Icons.play_circle_filled_rounded, size: 80, color: Colors.white.withValues(alpha: 0.85)),
                       ),
                     ),
                   ),
@@ -207,15 +188,8 @@ class _RecordedVideoPreviewState extends State<RecordedVideoPreview> {
               if (_controller.value.isInitialized)
                 IconButton.filled(
                   onPressed: _togglePlay,
-                  icon: Icon(
-                    _controller.value.isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF252836),
-                    foregroundColor: Colors.white,
-                  ),
+                  icon: Icon(_controller.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                  style: IconButton.styleFrom(backgroundColor: const Color(0xFF252836), foregroundColor: Colors.white),
                 ),
               if (widget.canRecordAgain && !widget.isSending) ...[
                 const SizedBox(width: 16),

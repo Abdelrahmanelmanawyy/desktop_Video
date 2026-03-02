@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/auth_provider.dart';
+import 'package:desktop_recorder/presentation/providers/auth_provider.dart';
 
 /// State for the sign-in form.
 class SignInFormState {

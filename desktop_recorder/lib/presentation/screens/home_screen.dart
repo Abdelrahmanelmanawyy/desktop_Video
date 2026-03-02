@@ -5,14 +5,14 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:desktop_recorder/models/doctor.dart';
-import 'package:desktop_recorder/models/rec_state.dart';
-import 'package:desktop_recorder/providers/auth_provider.dart';
-import 'package:desktop_recorder/providers/recording_provider.dart';
-import 'package:desktop_recorder/services/video_upload_service.dart';
-import 'package:desktop_recorder/widgets/framing_overlay_painter.dart';
-import 'package:desktop_recorder/widgets/indicator_chip.dart';
-import 'package:desktop_recorder/widgets/recorded_video_preview.dart';
+import 'package:desktop_recorder/data/models/doctor.dart';
+import 'package:desktop_recorder/data/models/rec_state.dart';
+import 'package:desktop_recorder/data/services/video_upload_service.dart';
+import 'package:desktop_recorder/presentation/providers/auth_provider.dart';
+import 'package:desktop_recorder/presentation/providers/recording_provider.dart';
+import 'package:desktop_recorder/presentation/widgets/framing_overlay_painter.dart';
+import 'package:desktop_recorder/presentation/widgets/indicator_chip.dart';
+import 'package:desktop_recorder/presentation/widgets/recorded_video_preview.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -52,14 +52,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _resetInactivityTimer() {
     _inactivityTimer?.cancel();
-    // Do not start sign-out countdown while camera is recording
     if (_recState == RecState.recording) return;
     _inactivityTimer = Timer(_inactivityTimeout, () {
       if (mounted) ref.read(authStateProvider.notifier).signOut();
     });
   }
 
-  /// Only use Canon cameras (EOS Webcam Utility or name contains "eos").
   static List<CameraDescription> _filterCanonCameras(List<CameraDescription> cameras) {
     return cameras.where((c) {
       final name = c.name.toLowerCase();
@@ -80,7 +78,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         });
         return;
       }
-      // Prefer EOS Webcam Utility if available
       final camera = canonCameras.firstWhere(
         (c) => c.name.toLowerCase().contains('eos') || c.name.toLowerCase().contains('webcam utility'),
         orElse: () => canonCameras.first,
@@ -115,18 +112,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  String _formatDuration(int sec) {
-    return '$sec sn';
-  }
+  String _formatDuration(int sec) => '$sec sn';
 
   Future<void> _onStartStop() async {
     if (!Platform.isWindows || _cameraController == null) return;
-    if (_recordingAttempts >= _maxRecordingAttempts &&
-        _recState != RecState.recording) {
-      return; // Prevent starting new recording if limit reached
-    }
+    if (_recordingAttempts >= _maxRecordingAttempts && _recState != RecState.recording) return;
     final controller = _cameraController!;
-
     if (_recState == RecState.recording) {
       await _stopRecording();
     } else {
@@ -148,12 +139,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final path = _lastRecordedPath;
     final user = ref.read(currentUserProvider);
     if (path == null || user == null) return;
-
     setState(() {
       _isSending = true;
       _sendProgress = 0.0;
     });
-
     final result = await zipAndUploadVideo(
       videoPath: path,
       uid: user.uid,
@@ -162,13 +151,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (mounted) setState(() => _sendProgress = p);
       },
     );
-
     if (!mounted) return;
     setState(() {
       _isSending = false;
       _sendProgress = 0.0;
     });
-
     if (result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -199,8 +186,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _errorMsg = null;
       _lastRecordedPath = null;
     });
-    _inactivityTimer?.cancel(); // Pause sign-out countdown during recording
-
+    _inactivityTimer?.cancel();
     try {
       await controller.startVideoRecording();
       _recordTimer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -233,29 +219,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _stopRecording() async {
     _recordTimer?.cancel();
     _recordTimer = null;
-
-    if (_cameraController == null ||
-        !_cameraController!.value.isRecordingVideo) {
+    if (_cameraController == null || !_cameraController!.value.isRecordingVideo) {
       setState(() => _recState = RecState.idle);
       return;
     }
-
     setState(() => _recState = RecState.finalizing);
-
     try {
       final file = await _cameraController!.stopVideoRecording();
       if (!mounted) return;
-
       final user = ref.read(currentUserProvider);
-      final doctor = Doctor(
-        doctorId: user?.uid ?? 'unknown',
-        name: user?.username ?? '',
-      );
+      final doctor = Doctor(doctorId: user?.uid ?? 'unknown', name: user?.username ?? '');
       final outputDir = Directory(saveDir);
       await outputDir.create(recursive: true);
       final outputPath = recordingPath(doctor);
       await file.saveTo(outputPath);
-
       if (mounted) {
         setState(() {
           _recState = RecState.finished;
@@ -304,10 +281,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.videocam_rounded,
-                        color: theme.colorScheme.primary,
-                      ),
+                      Icon(Icons.videocam_rounded, color: theme.colorScheme.primary),
                       const SizedBox(width: 8),
                       const Text('Masaüstü Kayıt'),
                     ],
@@ -316,28 +290,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Center(
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 10,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     decoration: BoxDecoration(
-                      color: _warning75
-                          ? Colors.orange.withValues(alpha: 0.2)
-                          : Colors.black54,
+                      color: _warning75 ? Colors.orange.withValues(alpha: 0.2) : Colors.black54,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _warning75 ? Colors.orange : Colors.white24,
-                        width: _warning75 ? 2 : 1,
-                      ),
+                      border: Border.all(color: _warning75 ? Colors.orange : Colors.white24, width: _warning75 ? 2 : 1),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.timer_outlined,
-                          size: 28,
-                          color: _warning75 ? Colors.orange : Colors.white70,
-                        ),
+                        Icon(Icons.timer_outlined, size: 28, color: _warning75 ? Colors.orange : Colors.white70),
                         const SizedBox(width: 10),
                         Text(
                           _formatDuration(_seconds),
@@ -391,10 +353,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 child: IgnorePointer(
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: Colors.amber,
-                                        width: 6,
-                                      ),
+                                      border: Border.all(color: Colors.amber, width: 6),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
@@ -407,23 +366,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   Text(
                                     isRecording
                                         ? 'Kayıt devam ediyor...'
-                                        : _recordingAttempts >=
-                                              _maxRecordingAttempts
-                                        ? 'Kayıt limitine ulaşıldı'
-                                        : 'Hazır olunca başlat',
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(
-                                          color: Colors.white70,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        : _recordingAttempts >= _maxRecordingAttempts
+                                            ? 'Kayıt limitine ulaşıldı'
+                                            : 'Hazır olunca başlat',
+                                    style: theme.textTheme.titleMedium?.copyWith(color: Colors.white70, fontWeight: FontWeight.w500),
                                   ),
-                                  if (_recordingAttempts >=
-                                      _maxRecordingAttempts) ...[
+                                  if (_recordingAttempts >= _maxRecordingAttempts) ...[
                                     const SizedBox(height: 8),
                                     Text(
                                       'Oturum başına en fazla $_maxRecordingAttempts kayıt',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(color: Colors.white54),
+                                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.white54),
                                     ),
                                   ],
                                 ],
@@ -437,37 +389,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
-                                    onTap: canStart || isRecording
-                                        ? () => _onStartStop()
-                                        : null,
+                                    onTap: canStart || isRecording ? () => _onStartStop() : null,
                                     borderRadius: BorderRadius.circular(40),
                                     child: AnimatedContainer(
-                                      duration: const Duration(
-                                        milliseconds: 200,
-                                      ),
+                                      duration: const Duration(milliseconds: 200),
                                       width: 100,
                                       height: 100,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: isRecording
-                                            ? Colors.red.shade600
-                                            : Colors.green.shade600,
+                                        color: isRecording ? Colors.red.shade600 : Colors.green.shade600,
                                         boxShadow: [
                                           BoxShadow(
-                                            color:
-                                                (isRecording
-                                                        ? Colors.red
-                                                        : Colors.green)
-                                                    .withValues(alpha: 0.4),
+                                            color: (isRecording ? Colors.red : Colors.green).withValues(alpha: 0.4),
                                             blurRadius: 20,
                                             spreadRadius: 2,
                                           ),
                                         ],
                                       ),
                                       child: Icon(
-                                        isRecording
-                                            ? Icons.stop_rounded
-                                            : Icons.fiber_manual_record_rounded,
+                                        isRecording ? Icons.stop_rounded : Icons.fiber_manual_record_rounded,
                                         size: 48,
                                         color: Colors.white,
                                       ),
@@ -481,19 +421,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                   ),
-
                   if (_errorMsg != null)
                     Positioned(
                       top: 20,
                       left: 20,
                       right: 20,
-                      child: IndicatorChip(
-                        icon: Icons.error_outline_rounded,
-                        label: _errorMsg!,
-                        color: Colors.red.shade400,
-                      ),
+                      child: IndicatorChip(icon: Icons.error_outline_rounded, label: _errorMsg!, color: Colors.red.shade400),
                     ),
-
                   if (_timeUpShown && isFinalizing)
                     Positioned.fill(
                       child: Container(
@@ -506,44 +440,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             color: const Color(0xFF252836),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: Colors.red.shade400),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 24,
-                                spreadRadius: 4,
-                              ),
-                            ],
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 24, spreadRadius: 4)],
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.timer_off_rounded,
-                                size: 48,
-                                color: Colors.red.shade400,
-                              ),
+                              Icon(Icons.timer_off_rounded, size: 48, color: Colors.red.shade400),
                               const SizedBox(height: 16),
-                              Text(
-                                'Süre doldu',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              Text('Süre doldu', style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),
-                              Text(
-                                'Kayıt 90. saniyede durduruldu.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white70,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              Text('Kayıt 90. saniyede durduruldu.', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70), textAlign: TextAlign.center),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   if (isFinalizing && !_timeUpShown)
                     Positioned.fill(
                       child: Container(
@@ -552,16 +463,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const CircularProgressIndicator(
-                              color: Colors.white,
-                            ),
+                            const CircularProgressIndicator(color: Colors.white),
                             const SizedBox(height: 20),
-                            Text(
-                              'Kayıt kaydediliyor...',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                              ),
-                            ),
+                            Text('Kayıt kaydediliyor...', style: theme.textTheme.titleMedium?.copyWith(color: Colors.white)),
                           ],
                         ),
                       ),
@@ -584,28 +488,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: [
                 Icon(Icons.videocam_off_rounded, size: 48, color: Colors.white38),
                 const SizedBox(height: 12),
-                Text(
-                  'Kamera kullanılamıyor',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white54,
-                  ),
-                ),
+                Text('Kamera kullanılamıyor', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white54)),
                 const SizedBox(height: 8),
-                Text(
-                  _cameraError!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.white38,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 5,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(_cameraError!, style: theme.textTheme.bodySmall?.copyWith(color: Colors.white38), textAlign: TextAlign.center, maxLines: 5, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: _initCamera,
-                  icon: const Icon(Icons.refresh, size: 20),
-                  label: const Text('Yeniden dene'),
-                ),
+                FilledButton.icon(onPressed: _initCamera, icon: const Icon(Icons.refresh, size: 20), label: const Text('Yeniden dene')),
               ],
             ),
           ),
@@ -636,12 +523,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             const CircularProgressIndicator(color: Colors.white54),
             const SizedBox(height: 16),
-            Text(
-              'Kamera yükleniyor...',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.white54,
-              ),
-            ),
+            Text('Kamera yükleniyor...', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white54)),
           ],
         ),
       ),

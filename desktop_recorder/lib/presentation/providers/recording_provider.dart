@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as path;
 
-import 'package:desktop_recorder/models/doctor.dart';
+import 'package:desktop_recorder/data/models/doctor.dart';
 
 /// Save directory for recordings (inside project folder).
 String get saveDir => path.join(Directory.current.path, 'recordings');
